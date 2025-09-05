@@ -1,0 +1,367 @@
+{
+  "name": "Kukatpally Grand Hall",
+  "description": "Spacious hall suitable for weddings and corporate events",
+  "location": "KUKATPALLY",
+  "address": "KPHB Phase 5, Hyderabad",
+  "pricePerSession": 20000,
+  "maxCapacity": 2500,
+  "email": "kphb.grandhall@gmail.com",
+  "events": null
+}
+
+
+{
+  "name": "Banjara Hills Luxury Convention",
+  "description": "Premium venue with luxury interiors for elite functions",
+  "location": "BANJARAHILLS",
+  "address": "Road No. 12, Banjara Hills, Hyderabad",
+  "pricePerSession": 35000,
+  "maxCapacity": 4000,
+  "email": "banjarahills.luxuryvenue@gmail.com",
+  "events": null
+}
+
+{
+  "name": "Gachibowli Sports Arena",
+  "description": "Perfect venue for concerts, exhibitions, and large gatherings",
+  "location": "GACHIBOWLI",
+  "address": "Near ISB, Gachibowli, Hyderabad",
+  "pricePerSession": 30000,
+  "maxCapacity": 5000,
+  "email": "gachibowli.sportsarena@gmail.com",
+  "events": null
+}
+
+
+
+-----------------------------------------------
+dummy text
+
+EventUserService.java
+package com.vilt.eventmanagement.eventmanagement_events.service;
+
+
+import com.vilt.eventmanagement.eventmanagement_events.Enums.EventSessions;
+import com.vilt.eventmanagement.eventmanagement_events.dto.EventUpdateDTO;
+import com.vilt.eventmanagement.eventmanagement_events.entity.Events;
+import com.vilt.eventmanagement.eventmanagement_events.entity.Venue;
+import com.vilt.eventmanagement.eventmanagement_events.exceptions.InvalidEventException;
+import com.vilt.eventmanagement.eventmanagement_events.exceptions.venueException.InvalidVenueException;
+import com.vilt.eventmanagement.eventmanagement_events.repository.EventRepository;
+import com.vilt.eventmanagement.eventmanagement_events.repository.VenueRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+@Service
+public class EventUserService {
+
+    private final EventRepository eventRepository;
+    private final VenueRepository venueRepository;
+
+    public EventUserService(EventRepository eventRepository, VenueRepository venueRepository){
+        this.eventRepository = eventRepository;
+        this.venueRepository = venueRepository;
+    }
+
+    public boolean checkForEventEligibilityTime(long userId, LocalDate currentDate, EventSessions session){
+        List<Events> evntInTimeFrame = eventRepository.findByUserIdAndEventDateAndEventSession(userId, currentDate, session);
+        return evntInTimeFrame.isEmpty();
+    }
+
+    // event creation
+    public ResponseEntity<String> createEvent(Events event){
+        Venue venue = event.getVenue();
+        // check for venue
+        Venue venueCheck = venueRepository.findById(venue.getId())
+                .orElseThrow(() -> new InvalidVenueException(
+                        "Venue with ID: " + venue.getId() + " and name: " + venue.getName() + " not found"));
+        // exception for vendor -> pick from vendor service
+        // ^^^ since we are using jwt token userID is obtained form it and vendor ID must be validated before hand
+        Long vendorID =  event.getVendorId();
+
+        // guest count should not be more than venue max capacity
+        int userExpectedGuestCount = event.getGuestCount();
+        int venueMaxCapacity = venueCheck.getMaxCapacity();
+        if(userExpectedGuestCount>venueMaxCapacity){
+            throw new InvalidEventException("Expected guest count of current event is "
+                    +userExpectedGuestCount+" greater than venue capacity "+ venueMaxCapacity+" please change venue or reduce guest count");
+        }
+
+        // check for budget
+        // for now check only for venue budget later we can look for vendor thing
+        long userBudget = event.getBudget();
+        long venueCost = venueCheck.getPricePerSession();
+        if (userBudget < venueCost) {throw new InvalidEventException(
+                    "Your budget (" + userBudget +") is less than the venue cost (" + venueCost +
+                            "). Please increase your budget or choose a different venue.");
+        }
+
+        // user should not have any other event in that time frame
+        LocalDate eventDate = event.getEventDate();
+        EventSessions session = event.getEventSession();
+        if(!checkForEventEligibilityTime(event.getUserId(), eventDate, session)){
+            throw new InvalidEventException(
+                    "You already have an event scheduled on " + eventDate +
+                            " during the " + session + " session. Please choose a different date or session.");
+        }
+
+        event.setVenue(venueCheck);
+        // all good
+        eventRepository.save(event);
+        return new ResponseEntity<>(
+                "Event '" + event.getName() + "' has been successfully created at location '"
+                        + event.getVenue().getLocation() + "' on "
+                        + event.getEventDate() + " during "
+                        + event.getEventSession() + " session.",
+                HttpStatus.CREATED
+        );
+
+    }
+
+
+
+
+    // Updating event
+    @Transactional
+    public ResponseEntity<Events> updateEvent(EventUpdateDTO events, long userId) {
+        // check for that event
+        long eventID = events.getId();
+        // invalid event
+        Events currentEvent = eventRepository.findById(eventID)
+                .orElseThrow(() -> new InvalidEventException("Event with id: " + eventID + " not found"));
+        // user ID should not be changed thorw error if its get changed
+        if (currentEvent.getUserId() != userId) {
+            throw new InvalidEventException("User ID cannot be changed for an event.");
+        }
+        // no fields sent in DTO
+        if (!events.hasAtLeastOneFieldToUpdate()) {
+            throw new InvalidEventException("Please add at least 1 field to update the event");
+        }
+        // *********
+        // update of events
+
+        // name
+        if (events.getName() != null) {
+            currentEvent.setName(events.getName());
+        }
+        // description
+        if (events.getDescription() != null) {
+            currentEvent.setDescription(events.getDescription());
+        }
+        // now before we can edit any of these new event date must be 2 days prior to our current date
+
+        LocalDate newDate = events.getEventDate();
+        LocalDate todayDate = LocalDate.now();
+
+        // Check if the new date is at least 2 days in the future
+        if (newDate != null) {
+            if (newDate.isBefore(todayDate.plusDays(2))) {
+                currentEvent.setEventDate(newDate);
+            } else {
+                throw new InvalidEventException(
+                        "You can only change the event date if it is at least 2 days from today ("
+                                + todayDate + ")."
+                );
+            }
+        }
+
+        // since no event date is provided change can only happen if current date is 2 days behind of event date
+        LocalDate actualEventDate = currentEvent.getEventDate();
+        if(!todayDate.isBefore(actualEventDate.plusDays(2))){
+            throw new InvalidEventException("You can only update the event date if it is at least" +
+                    " 2 days from today but you are free to change event Name and description"
+            );
+        }
+
+        // events
+        // later add more precisely
+        if (events.getTypes() != null) {
+            currentEvent.setTypes(events.getTypes());
+        }
+
+        // session
+        if(events.getEventSession()!=null){
+            currentEvent.setEventSession(events.getEventSession());
+        }
+
+        Long venueId = events.getVenueId();
+        Venue currentEventVenue = currentEvent.getVenue();
+        Venue newEventVenue;
+        // before changing the venue we must make sure of other fields of venue satisfying with our current venue or not
+        if (venueId != null) {
+            Venue venue = venueRepository.findById(venueId).
+                    orElseThrow(() -> new InvalidVenueException("Venue with ID:" + venueId + " dose not exists"));
+            if (!Objects.equals(currentEventVenue.getId(), venue.getId())) {
+                newEventVenue = venue;
+            } else {
+                newEventVenue = null;
+            }
+        } else {
+            newEventVenue = null;
+        }
+
+        // since our venue gets
+
+        // budget
+        Long  oldBudget = currentEvent.getBudget();
+        if(newEventVenue != null){
+            Long currentEventBudget = newEventVenue.getPricePerSession();
+            if(events.getBudget() != null){
+                Long newBudget = events.getBudget();
+                if(newBudget <= currentEventBudget){
+                    currentEvent.setBudget(newBudget);
+                }else{
+                    throw new InvalidEventException("Your budget (" + newBudget + ") is less than the updated venue cost (" + currentEventBudget +
+                            "). Please increase your budget .");
+                }
+            }else{
+                if(oldBudget <= currentEventBudget){
+                    throw new InvalidEventException("Your current venue budget (" + currentEventBudget + ") is less than the venue cost (" + currentEventBudget +
+                            "). Please increase your budget .");
+                }
+            }
+        }else{
+            if(events.getBudget() != null) {
+                Long newBudget = events.getBudget();
+                if (newBudget <= oldBudget) {
+                    long venueBudget = currentEventVenue.getPricePerSession();
+                    if (venueBudget >= newBudget) {
+                        currentEvent.setBudget(newBudget);
+                    } else {
+                        throw new InvalidEventException("Your budget (" + newBudget + ") is less than the venue cost (" + venueBudget +
+                                "). Please increase your budget .");
+                    }
+                }
+            }
+            // since no new event venue provided nor budget is specified we are moving out
+        }
+
+
+        // capacity
+        if(newEventVenue!=null){
+            if(events.getGuestCount()!=null){
+                Integer newGuestCount = events.getGuestCount();
+                if(newEventVenue.getMaxCapacity() >= newGuestCount){
+                    currentEvent.setGuestCount(newGuestCount);
+                }else{
+                    throw new InvalidEventException("Your guest count (" + newGuestCount + ") is more than the venue capacity (" + newEventVenue.getMaxCapacity() +
+                            "). Please decrease your guest count .");
+                }
+            }
+            else{
+                if(newEventVenue.getMaxCapacity() <= currentEvent.getGuestCount()){
+                    throw new InvalidEventException("Your guest count (" + currentEvent.getGuestCount() + ") is more than the new venue capacity (" + newEventVenue.getMaxCapacity() +
+                            "). Please decrease your guest count .");
+                }
+            }
+        }else{
+            if (events.getGuestCount() != null) {
+                Integer newGuestCount = events.getGuestCount();
+                if (newGuestCount <= currentEvent.getGuestCount()) {
+                    currentEvent.setGuestCount(newGuestCount);
+                } else {
+                    Integer venueGuestCount = currentEventVenue.getMaxCapacity();
+                    if(venueGuestCount >= newGuestCount){
+                        currentEvent.setGuestCount(newGuestCount);
+                    }else{
+                        throw new InvalidEventException("Your guest count" + newGuestCount + ") is more than the venue capacity" + venueGuestCount +
+                                " Please reduce your guest count .");
+                    }
+                }
+            }
+        }
+
+
+
+
+
+//        ---------------------------------------------
+        // remove the event form the previous venue and add it to new venue if there is a change in event
+        // reflect in venue table
+        Venue oldVenue = currentEvent.getVenue();
+        if(newEventVenue!= null && (!Objects.equals(newEventVenue.getId(), oldVenue.getId()))){
+            if (oldVenue.getEvents() != null) {
+                oldVenue.getEvents().remove(currentEvent);
+            }
+            Venue managedNewVenue = venueRepository.findById(newEventVenue.getId())
+                        .orElseThrow(() -> new InvalidVenueException("Venue with ID " + newEventVenue.getId() + " not found"));
+
+            currentEvent.setVenue(managedNewVenue);
+            managedNewVenue.getEvents().add(currentEvent);
+        }
+
+        Events updatedEvent = eventRepository.save(currentEvent);
+
+        return new ResponseEntity<>(updatedEvent, HttpStatus.OK);
+
+    }
+
+    // Deletion of Event
+    @Transactional
+    public String deleteEvent(long eventID){
+        Events currentEvent = eventRepository.findById(eventID)
+                .orElseThrow(() -> new InvalidEventException("Event with id: " + eventID + " not found"));
+
+        // notify user and vendor _> app complexity
+        //------
+
+//        remove that event from venue list
+        Venue venue = currentEvent.getVenue();
+        if (venue != null && venue.getEvents() != null) {
+            venue.getEvents().remove(currentEvent);
+        }
+        // Delete the event itself
+        eventRepository.delete(currentEvent);
+
+        return "Event with ID " + eventID + " has been deleted successfully.";
+
+    }
+
+    // by event Name + userName
+    public ResponseEntity<?> getEventByName(String name, long userId){
+        // user name checking
+        List<Events> getEvents = eventRepository.findByNameContainingAndUserId(name , userId);
+        if(getEvents.isEmpty()){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No events were found for name: " + name + " and userID: " + userId);
+        }
+        return ResponseEntity.ok(getEvents);
+    }
+
+    // by eventID + userName
+    public ResponseEntity<?> getEventById(long eventId, long userId){
+        Optional<Events> events = eventRepository.findByIdAndUserId(eventId, userId);
+        if(events.isEmpty()){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No event found with ID: " + eventId + " for userID: " + userId);
+        }
+        return ResponseEntity.ok(events);
+
+    }
+
+    // all events by particular user completed and about to happen
+    // latter change it to getCompleted Events
+    // Upcoming events
+    public ResponseEntity<?> eventsByUser(long userId){
+        List<Events> events = eventRepository.findByUserId(userId);
+        if(events.isEmpty()){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(" events for user ID :"+ userId+" is not found");
+        }
+        return ResponseEntity.ok(events);
+    }
+
+    // by date + userID
+
+
+    // method for past events by userID
+
+    // by session + userID
+
+
+}
+
