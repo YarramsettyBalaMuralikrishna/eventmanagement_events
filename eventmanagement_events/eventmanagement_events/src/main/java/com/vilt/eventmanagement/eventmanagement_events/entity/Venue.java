@@ -1,6 +1,7 @@
 package com.vilt.eventmanagement.eventmanagement_events.entity;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.vilt.eventmanagement.eventmanagement_events.Enums.Locations;
 import jakarta.persistence.*;
@@ -18,6 +19,7 @@ import java.util.List;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonIgnoreProperties({"events"})
 public class Venue {
 
     @Id
@@ -56,7 +58,8 @@ public class Venue {
     private Integer maxCapacity;
 
     @OneToMany(mappedBy = "venue", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JsonManagedReference
+//    @JsonManagedReference
+//    @JsonIgnoreProperties({"events"})
     private List<Events> events;
     // getters and setters
 }

@@ -3,13 +3,17 @@ package com.vilt.eventmanagement.eventmanagement_events.service;
 
 import com.vilt.eventmanagement.eventmanagement_events.Enums.EventTypes;
 import com.vilt.eventmanagement.eventmanagement_events.entity.Events;
+import com.vilt.eventmanagement.eventmanagement_events.exceptions.InvalidDateException;
 import com.vilt.eventmanagement.eventmanagement_events.exceptions.InvalidEventException;
 import com.vilt.eventmanagement.eventmanagement_events.exceptions.VendorAssignedException;
 import com.vilt.eventmanagement.eventmanagement_events.repository.EventRepository;
+import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.rmi.registry.LocateRegistry;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,6 +57,58 @@ public class EventVendorService {
 
         return ResponseEntity.ok("Vendor assigned successfully");
     }
+
+    // events done by vendor -> past,  ->future
+    public ResponseEntity<?>  pastEventsDoneByVendor(long vendorId){
+        LocalDate today = LocalDate.now();
+        List<Events> events = eventRepository.findByVendorIdAndEventDateBefore(vendorId, today);
+        if(events.isEmpty()){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No past events found for vendor with ID: " + vendorId + " before date " + today);
+        }
+        return  ResponseEntity.ok(events);
+    }
+    public ResponseEntity<?>  futureEventsByVendor(long vendorId){
+        LocalDate today = LocalDate.now();
+        List<Events> events = eventRepository.findByVendorIdAndEventDateAfter(vendorId, today);
+        if(events.isEmpty()){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("No future events found for vendor with ID: " + vendorId + " after date " + today);
+        }
+        return  ResponseEntity.ok(events);
+    }
+
+    // particular event date by vendor
+    public ResponseEntity<?> eventOnDate(long vendorId, LocalDate date){
+        List<Events> events = eventRepository.findByVendorIdAndEventDate(vendorId, date);
+        if(events.isEmpty()){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("No  events found for vendor with ID: " + vendorId + " on date " + date);
+        }
+        return  ResponseEntity.ok(events);
+    }
+
+    // events on date from date to date done by vendor
+    public ResponseEntity<?> eventsByDateRange(long vendorId, LocalDate pastDate, LocalDate futureDate){
+        if(pastDate==null){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("past date cannot be null");
+        }
+        if(futureDate==null){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("future date cannot be null");
+        }
+        if(pastDate.isAfter(futureDate)){
+            throw new InvalidDateException("past date cannot be ahead of future date");
+//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("");
+        }
+        List<Events> events = eventRepository.findByVendorIdAndEventDateBetweenOrderByEventDateAsc(vendorId, pastDate, futureDate);
+        if(events.isEmpty()){
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No events found for vendor with ID: " + vendorId + " in the date range " + pastDate + " to " + futureDate + ".");
+        }
+        return ResponseEntity.ok(events);
+    }
+
+
+
+    //  particular event
 
 
 

@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+
 @RestController
 @RequestMapping("/user")
 public class EventUserController {
@@ -58,6 +60,26 @@ public class EventUserController {
     @GetMapping("/allEventsByUser")
     public ResponseEntity<?> eventsByUser(){
         return eventUserGetService.eventsByUser(userId);
+    }
+
+    @GetMapping("/pastEvents")
+    public ResponseEntity<?> pastEventsByUser(){
+        return eventUserGetService.pastEventsByUser(userId);
+    }
+
+    @GetMapping("/futureEvents")
+    public ResponseEntity<?> futureEventsByUser(){
+        return eventUserGetService.futureEventsByUser(userId);
+    }
+
+    @GetMapping("/getEventByDate")
+    public ResponseEntity<?> getEventByDate(@RequestParam("date") LocalDate date){
+        return  eventUserGetService.getEventByDate(date, userId);
+    }
+
+    @GetMapping("/getEventsByDateRange")
+    public ResponseEntity<?> eventsByDateRange(@RequestParam("pastDate") LocalDate pastDate,@RequestParam("futureDate") LocalDate futureDate){
+        return eventUserGetService.eventsByDateRange(userId, pastDate, futureDate);
     }
 
 }

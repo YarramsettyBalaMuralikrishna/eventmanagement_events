@@ -62,7 +62,7 @@ public class Events {
 
     @ManyToOne
     @JoinColumn(name = "venue_id", nullable = false)
-    @JsonBackReference
+//    @JsonBackReference
     private Venue venue;
 
 }

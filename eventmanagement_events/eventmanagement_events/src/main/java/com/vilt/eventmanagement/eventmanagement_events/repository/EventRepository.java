@@ -19,9 +19,22 @@ public interface EventRepository extends JpaRepository<Events, Long> {
     List<Events> findByUserId(long userId);
 
     List<Events> findByUserIdAndEventDateAndEventSession(long userId, LocalDate eventDate, EventSessions eventSession);
-//--------------------------------
 
     List<Events> findByVendorId(long vendorId);
 
     List<Events> findByTypesAndVendorIdIsNull(EventTypes service);
+
+    List<Events> findByUserIdAndEventDateBefore(long userId, LocalDate today);
+
+    List<Events> findByUserIdAndEventDateAfter(long userId, LocalDate today);
+
+    List<Events> findByUserIdAndEventDate(long userId, LocalDate date);
+
+    List<Events> findByVendorIdAndEventDateBefore(long vendorId, LocalDate today);
+
+    List<Events> findByVendorIdAndEventDateAfter(long vendorId, LocalDate today);
+
+    List<Events> findByVendorIdAndEventDate(long vendorId, LocalDate date);
+
+    List<Events> findByVendorIdAndEventDateBetweenOrderByEventDateAsc(long vendorId, LocalDate pastDate, LocalDate futureDate);
 }
