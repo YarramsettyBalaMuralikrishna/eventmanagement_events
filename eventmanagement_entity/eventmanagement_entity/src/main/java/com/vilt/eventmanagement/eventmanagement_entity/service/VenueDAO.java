@@ -1,0 +1,4 @@
+package com.vilt.eventmanagement.eventmanagement_entity.service;
+
+public interface VenueDAO {
+}

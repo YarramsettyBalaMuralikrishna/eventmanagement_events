@@ -1,0 +1,24 @@
+Add the below annotation with @Cpnfiguration and @ComponentScan annotations
+@PropertySource("classPath:info.properties")
+
+
+why do we add an interface before an implementation class 
+BookDao interface
+BookDaoImp class
+
+1.Loose Coupling
+2.Seperation Conversion
+3. Dependency Inversion (SOLID design principles)
+
+
+
+A super type reference variable in java can be used to assign the adderrs of a sub type object.
+COnnection con = N
+
+con-> assigned with address of subtype object java.sql.ConnectionImpl@21423E
+
+
+job of @Transactional
+ 
+
+So, we have discussed about Spring Core, Spring AOP and Spring JDBC 

@@ -1,0 +1,4 @@
+tightly couping -> loose coupling we can do that by using interface
+
+
+for using spring core we must have spring-context, spring-context-support dependency should be present in pom.xml

@@ -1,0 +1,5 @@
+key: this is yml style
+spring:
+ application:
+    name: spring-jdbc-one
+
